@@ -1,0 +1,32 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2015
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "COMP 8045 Game 2", "COMP 8045 Game 2.csproj", "{C67C1143-54FF-3E1F-B8EF-BC69586A1685}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "COMP 8045 Game 2.Plugins", "COMP 8045 Game 2.Plugins.csproj", "{448F97A9-6B37-4DDD-5C32-115AA49EC3A5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "COMP 8045 Game 2.Editor", "COMP 8045 Game 2.Editor.csproj", "{604167D4-73BE-923F-DA57-266B6BE942DD}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C67C1143-54FF-3E1F-B8EF-BC69586A1685}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C67C1143-54FF-3E1F-B8EF-BC69586A1685}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C67C1143-54FF-3E1F-B8EF-BC69586A1685}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C67C1143-54FF-3E1F-B8EF-BC69586A1685}.Release|Any CPU.Build.0 = Release|Any CPU
+		{448F97A9-6B37-4DDD-5C32-115AA49EC3A5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{448F97A9-6B37-4DDD-5C32-115AA49EC3A5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{448F97A9-6B37-4DDD-5C32-115AA49EC3A5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{448F97A9-6B37-4DDD-5C32-115AA49EC3A5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{604167D4-73BE-923F-DA57-266B6BE942DD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{604167D4-73BE-923F-DA57-266B6BE942DD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{604167D4-73BE-923F-DA57-266B6BE942DD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{604167D4-73BE-923F-DA57-266B6BE942DD}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

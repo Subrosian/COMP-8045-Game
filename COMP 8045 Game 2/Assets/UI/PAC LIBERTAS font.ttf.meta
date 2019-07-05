@@ -1,0 +1,23 @@
+fileFormatVersion: 2
+guid: d54819a4359faa543a2dafffa5a3e633
+timeCreated: 1534821356
+licenseType: Free
+TrueTypeFontImporter:
+  externalObjects: {}
+  serializedVersion: 4
+  fontSize: 16
+  forceTextureCase: -2
+  characterSpacing: 0
+  characterPadding: 1
+  includeFontData: 1
+  fontName: PAC LIBERTAS
+  fontNames:
+  - PAC LIBERTAS
+  fallbackFontReferences: []
+  customCharacters: 
+  fontRenderingMode: 0
+  ascentCalculationMode: 1
+  useLegacyBoundsCalculation: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

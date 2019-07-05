@@ -1,0 +1,476 @@
+using Markov;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Runtime.Serialization.Formatters.Binary;
+using UnityEngine;
+
+public class ShadowSHMM : MonoBehaviour {
+
+    //feature combination
+    //represented as: <digits - where digits would be eg. <<unpacked><YKWIM>> with extracting each digit one by one <<through eg. division by 10><YKWIM>>> \ ints \ string
+    //with noting of how much space that such would take, and how much that such would improve space ... with noting of other things, such as <<graphics and such><YKWIM>>, vs. readability and\or such
+    //as an int: 
+    //as a string: [0-2][0-2][0-255][0-7][0-7]
+    //with maybe tokens to indicate <<variable><YKWIM>> numbers of digits for a value<< of a feature><YKWIM>>, such as two '|' chars surrounding such <<variable number digits><YKWIM>>, and either hardcoding the <<amounts of ><YKWIM>>the rest of the digits to specific <<amounts><YKWIM>> <<or all of such of said rest of the digits being set to 1><YKWIM>>
+    //and then: [0-2][0-1][0-8]
+    //as actions and\or such from such data, though such not being part of the feature combination string and\or such but as <<part of a weight<< and\or such><YKWIM>>><YKWIM>> in <<the ><YKWIM>><action probability distribution>
+    struct Features
+    {
+
+    }
+
+    //could make the action probability distribution a Dictionary, or something like what would have been seen in the MarkovChain and\or such
+
+    //map of (feature combination) : (action probability distribution) pairs
+    Dictionary<string, Dictionary<string, int>> SHMMData; //SHMMData
+
+
+    public bool isTraining;
+    public bool isUsing; //whether the Markov AI is to be used
+
+    public enum EnemyDistance { FAR, /*MIDRANGE, */NEAR }
+
+    public enum Action { Attack, Wander, Retreat }
+
+    string prevGenStr = "";
+
+    //public MarkovChain<MarkovUnit> AIData;
+    public List<List<int>> items_weights;
+    public List<string> items_weights_alltogether;
+
+    public string markovSaveFilePath;
+
+    public bool savingData;
+    public bool loadingData;
+
+    Queue<float> avgClosest2eDistances;
+
+    [Serializable()]
+    public struct MarkovUnit : IEquatable<MarkovUnit>
+    {
+        //features: enemy distance, behaviour between wander, attack, retreat ...
+        //noting of eg. 'using some number of bits' regarding data 
+        //bit packing to be space efficient? Could maybe see how the COMP3900 project and\or such was done? With Acho, Brian, Drew, William and me ...
+        //Noting of whether such could be done <for such of efficiency> and such in noting how such data would be represented and used, noting how <such would work for the project regarding time efficiency>
+        //noting of 200k frames of data, where each frame would have 2 byte-sized enums, with such being 400KB of data - so, space as not an issue anyway for 200k frames
+        //though if eg. regarding 30 playthroughs with each having 100k frames, then 6MB?
+
+        //features of this state
+        public EnemyDistance eDistance; //very basic feature for initial testing
+        public Action AIAction;
+
+
+        //classification of this state ...well, noting of weights and such and how such would be relative to another state in noting eg. state transitions and\or such, with <<how the Markov chain><YKWIM>> would work ... such and eg. a la <<n-grams and such><YKWIM>> - adding weight for the <<distribution><YKWIM>> of what would be given the state<< and\or 'sub-states' and\or such with noting of such of the number of such 'sub-states' and such matching the 'order' of the Markov chain><YKWIM>> <leading up to the last state>
+        /// <summary>
+        /// For boxing for MarkovChain
+        /// </summary>
+        /// <param name="other"></param>
+        /// <returns></returns>
+        public bool Equals(MarkovUnit other)
+        {
+            return eDistance == other.eDistance && AIAction == other.AIAction;
+        }
+    }
+
+    public MarkovUnit prevMarkovData1;
+
+    // Use this for initialization
+    void Start()
+    {
+        SHMMData = new Dictionary<string, Dictionary<string, int>>();
+        avgClosest2eDistances = new Queue<float>();
+    }
+
+    MarkovUnit getData() //returns what would be currData
+    {
+        MarkovUnit currData;
+
+        //compute median distance of enemies ... or basically determine whether there would be at least 2 enemies within a certain distance
+
+        GameObject[] enemies = GameObject.FindGameObjectsWithTag("Enemy");
+
+        //get num. near enemies
+        float nearRadius = 2.5f;
+        float nearRadiusSqr = nearRadius * nearRadius;
+        int nearEnemyCount = 0;
+        float avgEnemyDistanceOfClosest2 = 0;
+
+
+        float minDist = 99999f;
+        float minDist_2nd = 100000f;
+        GameObject minEnemy = gameObject;
+        foreach (GameObject enemy in enemies)
+        {
+            Vector2 enemyPos = enemy.transform.position;
+            Vector2 playerPos = GameObject.FindGameObjectWithTag("Player").transform.position;
+
+            float sqrDistance = (enemyPos - playerPos).sqrMagnitude;
+            if (sqrDistance <= nearRadiusSqr)
+            {
+                nearEnemyCount++;
+            }
+
+            float currEnemyDist = (enemyPos - playerPos).magnitude;
+
+            if (currEnemyDist < minDist)
+            {
+                //update the closest 2 enemies' distances
+                minDist_2nd = minDist;
+                minDist = currEnemyDist; //mistake in assigning in the opposite <<order ><YKWIM>>of the intended order of the operands< and any mistake in the most immediately above line of "minDist_2nd = currEnemyDist;" <that would be <<in the above line as at least part of such an above line, being all that there would be apart from the whitespace>< - note this is as I understand it to mean>> as of 5/19/18, <<3:36PM and at least part of 3:35PM>< - note this is as I understand it to mean>>>< with editing <<as correcting and such at 3:36-37PM< - later than the most immediately prior mentioned 3:36PM in the most immediately prior writing of "3:36PM and at least part of 3:35PM" as of this writing>>< - note this is as I understand it to mean>>> ... <<microsleeps during this - as (*AnyAdditionTo:'Microsleeps'And\OrSuch) with noting of such and what would be covered under (*Arsl,AnxTag#), with adding such and\or such to <wl: <<any additions to rep. sets and\or such>< - note this is as I understand it to mean>>><rmh: any additions to rep. sets and\or such> as unnecessary and N&NIIDWTC or NWFP>< - note this is as I understand it to mean>>
+                minEnemy = enemy;
+            }
+            else if (currEnemyDist < minDist_2nd)
+            {
+                //update the 2nd closest enemy's distance if only <<closer than what was the 2nd closest enemy distance found at this point in code running><YKWIM>>
+                minDist_2nd = currEnemyDist;
+            }
+            //enemy.GetComponentInChildren<SpriteRenderer>().color = Color.white; //done as debug
+        }
+
+        //minEnemy.GetComponentInChildren<SpriteRenderer>().color = Color.black;
+        //Debug.Log("minDist: " + minDist);
+        avgEnemyDistanceOfClosest2 = (minDist_2nd + minDist) / 2; //to be compared with that 180 frames before and\or such
+
+        if (nearEnemyCount >= 2)
+        {
+            currData.eDistance = EnemyDistance.NEAR;
+        }
+        else
+        {
+            currData.eDistance = EnemyDistance.FAR;
+        }
+
+        //quantize distance and classify it into NEAR, FAR
+        //currData.eDistance = EnemyDistance.FAR; //removed this< via commenting<< such><YKWIM>> out here> ...in favour of existing code that classifies such <<above><YKWIM>><< with a nearEnemyCount><YKWIM>> value
+
+
+        //get attack and classify it ...
+
+        //classification of whether the AI would be doing an "attacking" behaviour - which would just be shooting and maybe approaching, "Wander" behaviour - which would be having been moving sideways towards enemies <<if not alternatingly towards and away from enemies, noting of how such would be done in terms of such, noting of eg. <<rather large><YKWIM>> <<amounts of><YKWIM>> movement that would yield a <<low><YKWIM>> difference in distance from enemies><YKWIM>>, or "Retreat" behaviour - which would be moving away from enemies
+        //where such of moving away from enemies would be in increasing the distance between the closest enemy, or increasing the average distance from the closest 2 enemies
+        //with comparison with 2 seconds before, or 120 frames before, with noting of eg. positions tracked of eg. enemies in the past 120 frames and\or distances of such enemies from the player in the past 180 frames ... with eg. a queue storing such distances of each frame ... or keeping track of the past 180 frames ...
+        //Queue<float> avgClosest2eDistances = new Queue<float>(); //across 180F
+
+        //though could note of how the difference could be due to just the enemies moving and not necessarily the player moving; could note this as a <<super simplification><YKWIM>>
+        currData.AIAction = Action.Attack; //set in order to avoid Visual Studio <<from ><YKWIM>>displaying an "error" due to lack of initialization
+        float distanceDiff = 0;
+        float prevDistance = 0; //made for debugging; otherwise could do without this var
+        if (avgClosest2eDistances.Count >= 180)
+        {
+            //can compare the 180f prior with the curr.
+            prevDistance = avgClosest2eDistances.Dequeue();
+            distanceDiff = avgEnemyDistanceOfClosest2 - prevDistance;
+        }
+        else
+        {
+            if (avgClosest2eDistances.Count > 0)
+            {
+                prevDistance = avgClosest2eDistances.Peek();
+            }
+            distanceDiff = avgEnemyDistanceOfClosest2 - /*((avgClosest2eDistances.Count > 0)?avgClosest2eDistances.Peek() : 0f)*/prevDistance; //get the earliestmost unit of data
+        }
+        //Debug.Log("curr dist: " + avgEnemyDistanceOfClosest2 + ", prev dist: " + prevDistance+"; distanceDiff: "+distanceDiff);
+        if (distanceDiff > 1)
+        {
+            //consider such an amount of positive difference as retreat
+            currData.AIAction = Action.Retreat;
+        }
+        else if (distanceDiff > -1)
+        {
+            //consider such a small \ nonexistent difference as wander
+            currData.AIAction = Action.Wander;
+        }
+        else
+        {
+            //consider such an amount of negative difference as attack
+            currData.AIAction = Action.Attack;
+        }
+        avgClosest2eDistances.Enqueue(avgEnemyDistanceOfClosest2);
+        return currData;
+    }
+
+    // Update is called once per frame
+    void Update()
+    {
+        //features as with <<ShadowAIMarkov><YKWIM>>
+        //with: 
+        //-adding weights<<with such of writing <<such later><-nmn>>: > for eg. features and\or such>
+        //  -with noting of such <<with <removed an "I" here<< and an "s" if so, and a T most immediately following said "s"< where said "s" would have been most immediately following said "I" <rmh: f>if said "s" would have existed as said>><-nmn>>>isTraining><YKWIM>>
+        //-using such for behaviours
+        //  -with noting of such <<with isUsing><YKWIM>>
+        //
+        if (isTraining)
+        {
+            //Get state of enemy positions and 'player action'<< - with 'player action' being just the difference in distance in frames><YKWIM>>
+            MarkovUnit currData = getData(); //noting of not being able to pass an empty struct to the function, so not being able to pass <<removing here: wl>writing here later of: <<a null><YKWIM>>><removing here of: an empty> MarkovUnit<< as an argument to be modified and\or such><YKWIM>>
+
+            //SHMM feature combination and generation data, encoded as strings
+            string featureStr = "";
+            string genStr = "";
+            featureStr += ((char)(currData.eDistance + '0'));
+            //switch (currData.eDistance)
+            //{
+            //    case EnemyDistance.NEAR:
+            //        featureStr += "0";
+            //        break;
+            //    case EnemyDistance.FAR:
+            //        featureStr += "1";
+            //        break;
+            //}
+            genStr += ((char)(currData.AIAction + '0'));
+            //switch (currData.AIAction)
+            //{
+            //    case Action.Retreat:
+            //        genStr += "0";
+            //        break;
+            //    case Action.Wander:
+            //        genStr += "1";
+            //        break;
+            //    case Action.Attack:
+            //        genStr += "2";
+            //        break;
+            //}
+
+            //add to probability distribution map - add weight to the feature and generation combination
+            if(!SHMMData.ContainsKey(featureStr)) { //initialize if not already done
+                SHMMData[featureStr] = new Dictionary<string, int>();
+            }
+            if(!SHMMData[featureStr].ContainsKey(genStr)) //initialize if not already done
+            {
+                SHMMData[featureStr][genStr] = 0;
+            }
+            SHMMData[featureStr][genStr] += 1; //add 1 to the weight for the generation found within the generation probability distribution <<given the feature combination><YKWIM>>
+
+            //List<MarkovUnit> dataList = new List<MarkovUnit>();
+            //dataList.Add(prevMarkovData1); //<<the 'from' in the transitions - not necessarily existing, though prev. actions and features could be made into features<< as an alternate way to ><YKWIM>><do such>, with the SHMM><YKWIM>>
+            //dataList.Add(currData); //<<the 'to' in the transitions - having features and corresponding generated behaviour, with noting of separating of such in adding such to the SHMM><YKWIM>>
+
+            ////add to probability distribution map
+            //AIData.Add(dataList, 1); //requires an IEnumerable regarding data as the Markov chain would be <<an n-order Markov chain><YKWIM>> //<<ShadowAIMarkov version><YKWIM>>
+
+            //Noting of weights and basically adding a weight where the fraction of the weight would be its probability of being triggered by the AI and\or such as a transition ...
+            //noting of how eg. such would preserve the Markov data in a lot of frames ... noting of eg. how such would be probabilistic rather than eg. <<moreso periodic and\or such><YKWIM>>
+            prevMarkovData1 = currData;
+        }
+        //else is being used and/or testing
+
+        //if saving MarkovChain - save on the frame that "m" is <<first pressed><YKWIM>>
+        if (Input.GetKeyDown("m"))
+        {
+            savingData = true;
+        }
+
+        if (Input.GetKeyDown("u")) //toggle training and using
+        {
+            isUsing = !isUsing;
+            isTraining = !isTraining;
+        }
+
+        //TODO <<at 7/9/18, 6:18PM><YKWIM>> of <<making save and load data as for the SHMM><YKWIM>>
+        //if (savingData) //<<set this><YKWIM>> to true for one data save
+        //{
+        //    SaveData();
+        //    Debug.Log("Saving data of the Markov chain into serializable data");
+        //}
+
+
+        //if (loadingData)
+        //{
+        //    SerializableSaveData data;
+        //    data = LoadData();
+        //    AIData = data.AIMarkovChain;
+        //}
+
+        if (isUsing) //'action' mode as opposed to 'training'
+        {
+            // Randomly generate words that resemble the words in the dictionary.
+            var rand = new System.Random();
+
+            //get features and actions of the current feature combination, as stored in ...well, stored in <<what was CurrAIPrevMarkovUnit><YKWIM>> <<with features as set><YKWIM>>
+
+            //get <<next action><YKWIM>>
+            //noting of whether the <<features><YKWIM>> would be transitioned through probabilistically <<through internal probabilities of feature changes rather than the actual game features at the current <<frame and\or such><YKWIM>>><YKWIM>><< or where such features involved would be as found from the actual game><YKWIM>> ... <<well, seeing the <removed text of "latter" here>former of such just being through 'AI guesstimates' - with noting of such and such vs. the SHMM ><YKWIM>>use
+            //Queue<MarkovUnit> stateEnumerable = new Queue<MarkovUnit>();
+            //stateEnumerable.Enqueue(CurrAIPrevMarkovUnit); //noting of 1 MarkovUnit for each state ... so moving between MarkovUnits as to be equivalent to moving between states ... <<with TODO as of 7/8/18, 10:06PM><YKWIM>> //how would the features be determined? Where did the features update <<for the MarkovUnits><YKWIM>>?
+            //IEnumerable<MarkovUnit> nextItem = AIData.NextItem(stateEnumerable, rand); //select next item
+            //get next item among the randomized weights ...
+            //regarding <<"get <<next action><YKWIM>>" above< - as part of such>: ><YKWIM>>retrieve <<features from game state><YKWIM>>
+            MarkovUnit currData = getData(); //get current data, for the features
+
+            //SHMM feature combination and generation data, encoded as strings
+            string featureStr = "";
+            featureStr += ((char)(currData.eDistance + '0'));
+            //switch (currData.eDistance)
+            //{
+            //    case EnemyDistance.NEAR:
+            //        featureStr += "0";
+            //        break;
+            //    case EnemyDistance.FAR:
+            //        featureStr += "1";
+            //        break;
+            //}
+
+            //if feature combination is not present, then do nothing <<regarding the genStr, etc.><YKWIM>>
+            if (SHMMData.ContainsKey(featureStr))
+            { 
+                var totalOfWeights = SHMMData[/*feature string*/featureStr].Sum(w => w.Value);// <<with TODO as of 7/8/18, 10:06PM< - later than a prior 10:06PM on 7/8/18 written> <<removed a "w" here>elsewhere>><YKWIM>>
+                var value = rand.Next(totalOfWeights) + 1/* - with the + 1 being ... in being <<'up to' that weight integer rather than <up to ((the weight integer)-1)>><YKWIM>>*/; //value selected among the weights
+
+                string selectedGenStr = ""; //generation that would have been <randomly >selected among the <<distribution of weights><YKWIM>><< - being part of a probability distribution><YKWIM>>
+
+                var currentWeight = 0;
+                foreach (var nextItem in SHMMData[featureStr]) //iterate through the weights and select the first <<item><YKWIM>> that would <<reach the ><YKWIM>><<random value threshold><YKWIM>> to add to the state
+                {
+                    currentWeight += nextItem.Value;
+                    if (currentWeight >= value) //selected item <<at the value><YKWIM>>
+                    {
+                        //yield return nextItem.Key; //select this as the nextItem <<- as a MarkovUnit><YKWIM>>
+                        //state.Enqueue(nextItem.Key);
+                        selectedGenStr = nextItem.Key;
+                        break;
+                    }
+                }
+
+                //parse <<generation str><YKWIM>> into generation <<enums and\or such><YKWIM>>
+
+                //Debug.Log("AIData: " + AIData + "\r\n" + "nextItem: "+nextItem);
+
+                //var nextItemQueue = nextItem.Last();
+                //MarkovUnit newAIMarkovUnit = nextItemQueue;
+                //if (!newAIMarkovUnit.Equals(CurrAIPrevMarkovUnit)) //<wl: corrected from >if(!newAIState.Equals(nextItemQueue)) //if a state change occured
+                //{
+                //    CurrAIPrevMarkovUnit = newAIMarkovUnit; //corrected from "nextItemQueue = newAIState;"
+                //    switch (newAIMarkovUnit.AIAction)
+                //    {
+                //        case Action.Retreat:
+                //            Debug.Log("Shadow AI now on Retreat");
+                //            break;
+                //        case Action.Attack:
+                //            Debug.Log("Shadow AI now on Attack");
+                //            break;
+                //        case Action.Wander:
+                //            Debug.Log("Shadow AI now on Wander");
+                //            break;
+                //    }
+                //}
+                if (!selectedGenStr.Equals(prevGenStr)) //do things with selectedGenStr
+                {
+                    prevGenStr = selectedGenStr;
+                    Action AIActionNum = (Action)(selectedGenStr[0]/* - read as a char?*/ - '0'); //with AI action with index 0
+                    switch (AIActionNum)
+                    {
+                        case Action.Retreat:
+                            Debug.Log("Shadow AI now on Retreat");
+                            break;
+                        case Action.Attack:
+                            Debug.Log("Shadow AI now on Attack");
+                            break;
+                        case Action.Wander:
+                            Debug.Log("Shadow AI now on Wander");
+                            break;
+                    }
+                }
+
+                //for (int i = 0; i < 10; i++)
+                //{
+                //    var word = AIData.Chain(rand);
+                //    //Console.WriteLine(word);
+                //}
+
+                ////behaviour of AI based on the action ... of higher level ...
+                ////'retreat' behaviour, noting of how such would be hardcoded ...
+                //Debug.Log("Shadow AI now on Retreat");
+
+
+                ////'attack' behaviour ...
+                //Debug.Log("Shadow AI now on Attack");
+                ////'wander' behaviour ...
+                //Debug.Log("Shadow AI now on Wander");
+            }
+        }
+
+        //Debug stuff - with TODO<< at 7/9/18, 6:22PM><YKWIM>><< of making such work for the SHMM><YKWIM>>
+        //Dictionary<ChainState<MarkovUnit>, Dictionary<MarkovUnit, int>> items = AIData.items;
+
+        ////create a List with the current weights
+        ////items_weights = new List<List<int>>();
+        ////foreach(var item in items)
+        ////{
+        ////    List<int> itemWeightList = new List<int>();
+        ////    items_weights.Add(itemWeightList);
+        ////    foreach(var item_weight in item.Value)
+        ////    {
+        ////        itemWeightList.Add(item_weight.Value); //weight of the MarkovUnit
+        ////    }
+        ////}
+        //items_weights_alltogether = new List<string>();
+        //foreach (var item in items)
+        //{
+        //    //List<int> itemWeightList = new List<int>();
+        //    //items_weights.Add(itemWeightList);
+        //    if (item.Key.items.Length >= 1)
+        //    {
+        //        MarkovUnit currItemMarkov = item.Key.items.Last(); //get the last item in the state, if there is one
+        //        string AIActionText = "";
+        //        switch (currItemMarkov.AIAction)
+        //        {
+        //            case Action.Attack:
+        //                AIActionText = "Attack";
+        //                break;
+        //            case Action.Retreat:
+        //                AIActionText = "Retreat";
+        //                break;
+        //            case Action.Wander:
+        //                AIActionText = "Wander";
+        //                break;
+        //        }
+        //        string eDistanceText = "";
+        //        switch (currItemMarkov.eDistance)
+        //        {
+        //            case EnemyDistance.FAR:
+        //                eDistanceText = "FAR";
+        //                break;
+        //            case EnemyDistance.NEAR:
+        //                eDistanceText = "NEAR";
+        //                break;
+        //        }
+        //        items_weights_alltogether.Add("Unit " + AIActionText + ", " + eDistanceText + ": "); //MarkovUnit based on 
+        //    }
+        //    else
+        //    {
+        //        items_weights_alltogether.Add("empty ChainState");
+        //    }
+        //    foreach (var transitionItem in item.Value)
+        //    {
+        //        MarkovUnit ctiMarkov = transitionItem.Key;
+        //        string AIActionText = "";
+        //        switch (ctiMarkov.AIAction)
+        //        {
+        //            case Action.Attack:
+        //                AIActionText = "Attack";
+        //                break;
+        //            case Action.Retreat:
+        //                AIActionText = "Retreat";
+        //                break;
+        //            case Action.Wander:
+        //                AIActionText = "Wander";
+        //                break;
+        //        }
+        //        string eDistanceText = "";
+        //        switch (ctiMarkov.eDistance)
+        //        {
+        //            case EnemyDistance.FAR:
+        //                eDistanceText = "FAR";
+        //                break;
+        //            case EnemyDistance.NEAR:
+        //                eDistanceText = "NEAR";
+        //                break;
+        //        }
+        //        items_weights_alltogether.Add(AIActionText + ", " + eDistanceText + ": " + transitionItem.Value.ToString()); //weight of the MarkovUnit
+        //    }
+        //}
+    }
+}
